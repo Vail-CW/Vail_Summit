@@ -1,0 +1,21 @@
+# Claude Code settings
+.claude/
+
+# Arduino build artifacts
+*.hex
+*.elf
+*.eep
+*.lss
+*.map
+*.sym
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
