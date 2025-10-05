@@ -1,0 +1,455 @@
+# VAIL SUMMIT - Morse Code Training Device
+
+## Project Overview
+
+VAIL SUMMIT is a portable morse code training device built on the ESP32-S3 Feather platform. It features a modern touchscreen UI, battery monitoring, WiFi/Bluetooth connectivity, and an iambic paddle interface for morse code practice.
+
+---
+
+## Hardware Components
+
+### Main Controller
+- **Adafruit ESP32-S3 Feather V2**
+  - 4MB Flash, 2MB PSRAM
+  - Built-in battery charging (MCP73831)
+  - I2C battery fuel gauge (MAX17048 at address 0x36)
+  - USB Type-C connector
+
+### Display
+- **Waveshare 2" LCD (240x320)**
+  - Controller: ST7789V
+  - Interface: SPI
+  - Running in landscape mode (320x240)
+
+### Input Devices
+- **M5Stack CardKB**
+  - Interface: I2C (address 0x5F)
+  - Mini QWERTY keyboard with arrow keys
+  - Connected via STEMMA QT connector
+
+- **Iambic Paddle**
+  - Dual-lever morse code key
+  - Connected via 3.5mm TRS jack
+  - Dit (tip) and Dah (ring) inputs
+
+### Audio Output
+- **Buzzer**
+  - PWM-driven piezo buzzer
+  - Multiple tone frequencies for different UI events
+
+### Power
+- **350mAh LiPo Battery**
+  - Rechargeable via USB-C
+  - Monitored by MAX17048 fuel gauge chip
+
+---
+
+## Pin Assignments
+
+### LCD Display (SPI)
+```
+TFT_CS      = 10    // Chip Select
+TFT_DC      = 11    // Data/Command
+TFT_RST     = 12    // Reset
+TFT_BL      = 13    // Backlight (PWM controlled)
+TFT_MOSI    = 35    // SPI Data (hardware SPI)
+TFT_SCK     = 36    // SPI Clock (hardware SPI)
+```
+
+### CardKB Keyboard (I2C)
+```
+I2C_SDA     = 3     // I2C Data (STEMMA QT)
+I2C_SCL     = 4     // I2C Clock (STEMMA QT)
+CARDKB_ADDR = 0x5F  // I2C Address
+```
+
+### Iambic Paddle (Digital Input)
+```
+DIT_PIN     = 6     // Dit paddle (active LOW with pullup)
+DAH_PIN     = 9     // Dah paddle (active LOW with pullup)
+```
+
+### Audio
+```
+BUZZER_PIN  = 5     // PWM output for buzzer
+```
+
+### Battery Monitoring
+```
+USB_DETECT_PIN = A3       // USB power detection
+MAX17048 I2C Address: 0x36  // Battery fuel gauge
+```
+
+---
+
+## I2C Device Map
+
+| Address | Device          | Purpose                           |
+|---------|-----------------|-----------------------------------|
+| 0x36    | MAX17048        | Battery fuel gauge (voltage & %)  |
+| 0x5F    | CardKB          | I2C keyboard                      |
+
+---
+
+## Software Architecture
+
+### Libraries Used
+- `Adafruit_GFX` - Graphics primitives
+- `Adafruit_ST7789` - Display driver
+- `Adafruit_MAX1704X` - Battery monitoring
+- `Wire` - I2C communication
+- `WiFi` - WiFi functionality
+- `SPI` - SPI communication
+
+### Key Features Implemented
+
+#### 1. Menu System
+- **Modern carousel/stack UI design**
+- Four menu options:
+  1. Training
+  2. Settings
+  3. WiFi
+  4. Bluetooth
+- Arrow key navigation (up/down)
+- Enter key to select
+- Visual feedback with card-based layout
+
+#### 2. Status Bar
+- **WiFi indicator**: Green (connected) / Red (disconnected)
+- **Battery indicator**:
+  - Color-coded by charge level (green >60%, yellow >20%, red ≤20%)
+  - Shows charge percentage as fill level
+  - White lightning bolt with black outline when USB connected/charging
+  - Updates every 5 seconds
+
+#### 3. Battery Management
+- **MAX17048 fuel gauge integration**
+  - Accurate voltage reading (0.01V precision)
+  - State of charge percentage
+  - Auto-calibrates over charge cycles
+- **USB detection via analog pin**
+  - Reads USB voltage on pin A3
+  - ADC threshold: >500 = USB connected
+  - Works with wall warts, battery banks, or PC
+
+#### 4. Display Management
+- **PWM backlight control**
+  - Uses ESP32 LEDC API (ledcAttach)
+  - 5kHz frequency, 8-bit resolution
+  - Full brightness (255/255)
+- **Landscape orientation** (320x240)
+- **Custom fonts**: FreeSansBold12pt7b, FreeSans9pt7b
+
+#### 5. Audio Feedback
+Different tones for different actions:
+```
+TONE_SIDETONE   = 700 Hz   // Morse code audio
+TONE_MENU_NAV   = 800 Hz   // Menu navigation
+TONE_SELECT     = 1200 Hz  // Selection confirmation
+TONE_ERROR      = 400 Hz   // Error/invalid action
+TONE_STARTUP    = 1000 Hz  // Device startup
+```
+
+### CardKB Key Mapping
+```
+KEY_UP        = 0xB5  // Navigate up in menu
+KEY_DOWN      = 0xB6  // Navigate down in menu
+KEY_LEFT      = 0xB4  // Left arrow
+KEY_RIGHT     = 0xB7  // Right arrow
+KEY_ENTER     = 0x0D  // Select menu item
+KEY_ENTER_ALT = 0x0A  // Alternate enter
+KEY_BACKSPACE = 0x08  // Backspace (Fn+X)
+KEY_ESC       = 0x1B  // Escape (Fn+Z)
+KEY_TAB       = 0x09  // Tab (Fn+Space)
+```
+
+---
+
+## UI Design
+
+### Color Scheme
+```
+Background:      Black
+Title:           Cyan
+Text:            White
+Highlight BG:    Blue
+Highlight FG:    White
+Success:         Green
+Error:           Red
+Warning:         Yellow
+```
+
+### Layout
+```
+┌─────────────────────────────────────┐
+│ VAIL SUMMIT          [WiFi] [Batt]  │ ← Header (Cyan title + status icons)
+├─────────────────────────────────────┤
+│                                     │
+│      ┌────────────┐                 │
+│      │  ○ T       │  ← Stack card   │
+│      └────────────┘                 │
+│   ┌─────────────────┐               │
+│   │   ◉ Training    │  ← Main card  │
+│   └─────────────────┘               │
+│      ┌────────────┐                 │
+│      │  ○ S       │  ← Stack card   │
+│      └────────────┘                 │
+│                                     │
+├─────────────────────────────────────┤
+│     ↑/↓ Navigate  ENTER Select      │ ← Footer help text
+└─────────────────────────────────────┘
+```
+
+### Menu Cards
+- **Main card**: Selected item, large with full text
+- **Stack cards**: Adjacent items above/below, abbreviated with icon only
+- Smooth scrolling feel through card positioning
+
+---
+
+## Configuration
+
+All hardware settings are centralized in `config.h`:
+- Pin definitions
+- Display settings
+- I2C addresses
+- Key codes
+- Audio tone frequencies
+- Morse code timing (WPM settings)
+- UI color scheme
+- Menu layout constants
+
+---
+
+## Development Progress
+
+### ✅ Completed Features
+
+#### Core System
+- [x] Basic menu navigation system
+- [x] Landscape display orientation (320x240)
+- [x] Modern carousel UI design with card-based layout
+- [x] WiFi status indicator
+- [x] Battery voltage and percentage monitoring
+- [x] USB/charging detection via analog pin
+- [x] PWM backlight control
+- [x] I2C battery fuel gauge integration (MAX17048)
+- [x] Status icon updates (every 5 seconds)
+- [x] Audio feedback for navigation
+- [x] Modular configuration system (config.h)
+- [x] Multi-level menu system with mode switching
+
+#### Morse Code Engine
+- [x] Complete morse code lookup table (A-Z, 0-9, punctuation)
+- [x] WPM-based timing calculations (PARIS method)
+- [x] Morse code playback through buzzer
+- [x] Variable speed support (5-40 WPM)
+
+#### Training Modes
+- [x] **"Hear It Type It" Training Mode**
+  - Random US ham radio callsign generator (format: `^[AKNW][A-Z]{0,2}[0-9][A-Z]{1,3}$`)
+  - Variable speed practice (12-20 WPM, randomized per callsign)
+  - Real-time text input with modern UI
+  - Optimized input box rendering (only redraws box on keypress)
+  - Correct/incorrect feedback with visual and audio cues
+  - Replay function (ESC key)
+  - Skip function (TAB key)
+  - Attempt counter
+  - Serial debug output for troubleshooting
+
+### 🚧 Pending Features
+- [ ] Additional training modes (Koch method, character drills, etc.)
+- [ ] Settings menu (WPM adjustment, tone frequency, etc.)
+- [ ] WiFi configuration interface
+- [ ] Bluetooth connectivity
+- [ ] Iambic paddle input handling
+- [ ] Character recognition/decoding (decode mode)
+- [ ] Progress tracking and statistics
+- [ ] Deep sleep power management
+
+---
+
+## Known Issues & Notes
+
+### Battery Calibration
+The MAX17048 fuel gauge requires several charge/discharge cycles to accurately learn battery capacity. Initial readings may show lower percentages (e.g., 90% for a fully charged battery at 4.11V). This is normal and will improve with use.
+
+### CardKB LED Flash
+The CardKB keyboard flashes a white LED 3 times during navigation input. This is a hardware feature and cannot be disabled in software.
+
+### USB Detection Threshold
+The USB detection uses an ADC reading on pin A3 with a threshold of 500. This may need adjustment based on actual hardware readings when USB is connected/disconnected.
+
+---
+
+## Morse Code Timing
+
+Uses the standard **PARIS method**:
+- 50 dit units per word
+- Dit duration (ms) = 1200 / WPM
+- Default: 20 WPM
+- Range: 5-40 WPM
+
+**Timing relationships:**
+- Dah = 3 × dit
+- Inter-element gap = 1 × dit
+- Letter gap = 3 × dit
+- Word gap = 7 × dit
+
+---
+
+## Serial Debug Output
+
+Baud rate: **115200**
+
+Example output:
+```
+=== VAIL SUMMIT STARTING ===
+Initializing backlight...
+Backlight ON
+Initializing display...
+Display initialized
+Initializing I2C...
+Initializing battery monitor...
+Found MAX17048 with Chip ID: 0x12
+Battery: 4.11V, 90%
+USB detected (ADC: 2845)
+Setup complete!
+```
+
+---
+
+## Build Instructions
+
+### Required Arduino Libraries
+1. Adafruit GFX Library
+2. Adafruit ST7735 and ST7789 Library
+3. Adafruit MAX1704X
+4. Adafruit LC709203F (backup battery monitor support)
+
+### Board Configuration
+- Board: **ESP32S3 Dev Module** or **Adafruit Feather ESP32-S3**
+- USB CDC On Boot: **Enabled**
+- Flash Size: **4MB**
+- PSRAM: **OPI PSRAM**
+- Upload Speed: **921600**
+
+### Compilation
+1. Install required libraries via Arduino Library Manager
+2. Select correct board and port
+3. Upload `morse_trainer_menu.ino`
+
+---
+
+## File Structure
+
+```
+Project Jupiter/
+├── morse_trainer_menu/
+│   ├── morse_trainer_menu.ino        # Main program with menu system
+│   ├── config.h                      # Hardware configuration
+│   ├── morse_code.h                  # Morse code engine and lookup tables
+│   └── training_hear_it_type_it.h    # "Hear It Type It" training mode
+├── ESP32-S3 Project Hardware Documentation.pdf
+└── README.md                         # This file
+```
+
+---
+
+## Training Modes
+
+### Hear It Type It
+
+**Purpose**: Practice receiving morse code by listening to random callsigns and typing what you hear.
+
+**How it works:**
+1. Navigate to Training → Hear It Type It from main menu
+2. A random US ham radio callsign is generated (e.g., W4ABC, KA2XYZ)
+3. The callsign is sent via morse code through the buzzer at a random speed (12-20 WPM)
+4. Type what you heard using the CardKB keyboard
+5. Press ENTER to submit your answer
+6. Receive immediate feedback (CORRECT/INCORRECT)
+7. If incorrect, the callsign replays for another attempt
+8. If correct, a new callsign is automatically generated
+
+**Controls:**
+- **Type A-Z, 0-9**: Enter characters (auto-uppercase)
+- **BACKSPACE**: Delete last character
+- **ENTER**: Submit answer
+- **ESC**: Replay current callsign
+- **TAB**: Skip to next callsign
+
+**Features:**
+- Callsigns follow official US format: `^[AKNW][A-Z]{0,2}[0-9][A-Z]{1,3}$`
+- Speed varies randomly (12-20 WPM) but remains constant per callsign
+- Attempt counter shows how many tries on current callsign
+- Modern UI with large input box and blinking cursor
+- Optimized rendering (only input box redraws during typing)
+- Debug output to serial monitor shows answer (for practice/troubleshooting)
+
+**UI Elements:**
+```
+┌─────────────────────────────────────┐
+│ TRAINING             [WiFi] [Batt]  │
+├─────────────────────────────────────┤
+│        HEAR IT TYPE IT              │
+│             15 WPM                  │
+│                                     │
+│      Type what you heard:           │
+│   ┌─────────────────────────────┐   │
+│   │  W4ABC_                     │   │ ← Input box
+│   └─────────────────────────────┘   │
+│                                     │
+│         Attempt 2                   │
+├─────────────────────────────────────┤
+│ ENTER Submit  ESC Replay  TAB Skip  │
+└─────────────────────────────────────┘
+```
+
+---
+
+## Future Enhancements
+
+### Training Features
+- Koch method training
+- Farnsworth spacing
+- Random character drills
+- Word practice
+- QSO simulation
+- Speed ramping
+
+### UI Improvements
+- Settings persistence (EEPROM/preferences)
+- Brightness control
+- Volume control
+- Theme selection
+
+### Connectivity
+- WiFi-based morse practice (internet)
+- Bluetooth keyboard mode
+- Web-based configuration interface
+- OTA firmware updates
+
+### Power Management
+- Auto-sleep timer
+- Deep sleep with wake-on-key
+- Battery life optimization
+
+---
+
+## Credits
+
+**Hardware Platform**: Adafruit ESP32-S3 Feather V2
+**Display**: Waveshare 2" LCD Module
+**Keyboard**: M5Stack CardKB
+**Development**: Built with Arduino IDE and Adafruit libraries
+
+---
+
+## License
+
+This project is for educational and personal use.
+
+---
+
+*Last Updated: 2025-10-05*
