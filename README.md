@@ -578,6 +578,8 @@ Project Jupiter/
 
 ## Credits
 
+**Author**: Brett Hollifield KE9BOS
+**Email**: ke9bos@pigletradio.org
 **Hardware Platform**: Adafruit ESP32-S3 Feather V2
 **Display**: Waveshare 2" LCD Module
 **Keyboard**: M5Stack CardKB
@@ -591,4 +593,4 @@ This project is for educational and personal use.
 
 ---
 
-*Last Updated: 2025-01-05*
+*Last Updated: 2025-10-05*
