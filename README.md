@@ -244,6 +244,7 @@ All hardware settings are centralized in `config.h`:
 - [x] Audio feedback for navigation
 - [x] Modular configuration system (config.h)
 - [x] Multi-level menu system with mode switching
+- [x] Deep sleep power management with wake-on-paddle
 
 #### Morse Code Engine
 - [x] Complete morse code lookup table (A-Z, 0-9, punctuation)
@@ -306,8 +307,32 @@ All hardware settings are centralized in `config.h`:
 - [ ] Bluetooth connectivity
 - [ ] Character recognition/decoding (decode mode)
 - [ ] Progress tracking and statistics
-- [ ] Deep sleep power management
 - [ ] Volume control
+
+---
+
+## Power Management
+
+### Deep Sleep Mode
+
+**How to enter sleep:**
+1. From the main menu, hold ESC for 3 seconds
+2. Device will beep and show "Going to Sleep..." message
+3. Screen turns off, device enters ultra-low power mode (~20µA)
+
+**How to wake:**
+- Press the DIT paddle
+- Device performs full restart from setup()
+
+**Battery Life Estimates (350mAh battery):**
+- Active Vail Chat (WiFi): 1.5-2 hours
+- Practice Mode (no WiFi): 2-2.5 hours
+- Deep Sleep: ~750 hours (31 days)
+
+**With 18650 battery (3000mAh):**
+- Active Vail Chat (WiFi): 10-15 hours
+- Practice Mode (no WiFi): 20-23 hours
+- Deep Sleep: ~6400 hours (267 days / 8.9 months)
 
 ---
 

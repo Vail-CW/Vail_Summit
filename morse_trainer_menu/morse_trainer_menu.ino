@@ -40,6 +40,11 @@ enum MenuMode {
 
 MenuMode currentMode = MODE_MAIN_MENU;
 
+// Deep sleep tracking
+unsigned long escPressStartTime = 0;
+bool escHeldForSleep = false;
+#define SLEEP_HOLD_TIME 3000  // 3 seconds to enter sleep
+
 String mainMenuOptions[MENU_ITEMS] = {
   "Training",
   "Settings",
@@ -226,10 +231,68 @@ void loop() {
 
     if (key != 0) {
       handleKeyPress(key);
+    } else {
+      // No key pressed - reset ESC timer
+      escPressStartTime = 0;
+      escHeldForSleep = false;
+    }
+  } else {
+    // No key available - reset ESC timer
+    escPressStartTime = 0;
+    escHeldForSleep = false;
+  }
+
+  // Check for long ESC press to enter deep sleep (only in main menu)
+  if (currentMode == MODE_MAIN_MENU && escPressStartTime > 0 && !escHeldForSleep) {
+    if (millis() - escPressStartTime >= SLEEP_HOLD_TIME) {
+      escHeldForSleep = true;
+      tone(BUZZER_PIN, TONE_STARTUP, 200);
+      delay(200);
+      enterDeepSleep();
     }
   }
 
   delay(10);
+}
+
+void enterDeepSleep() {
+  Serial.println("Entering deep sleep...");
+
+  // Disconnect WiFi if connected
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+  }
+
+  // Show sleep message
+  tft.fillScreen(COLOR_BACKGROUND);
+  tft.setFont(&FreeSansBold12pt7b);
+  tft.setTextColor(ST77XX_CYAN);
+  tft.setTextSize(1);
+
+  tft.setCursor(40, 110);
+  tft.print("Going to");
+  tft.setCursor(50, 140);
+  tft.print("Sleep...");
+
+  tft.setFont();
+  tft.setTextSize(1);
+  tft.setTextColor(0x7BEF);
+  tft.setCursor(30, 180);
+  tft.print("Press DIT paddle to wake");
+
+  delay(2000);
+
+  // Turn off display
+  tft.fillScreen(ST77XX_BLACK);
+  ledcWrite(0, 0);  // Turn off backlight
+
+  // Configure wake on DIT paddle press (active LOW)
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)DIT_PIN, LOW);
+
+  // Enter deep sleep
+  esp_deep_sleep_start();
+  // Device will wake here and restart from setup()
 }
 
 void handleKeyPress(char key) {
@@ -327,13 +390,20 @@ void handleKeyPress(char key) {
     else if (key == KEY_ENTER || key == KEY_ENTER_ALT) {
       selectMenuItem();
     }
-    else if (key == KEY_ESC && (currentMode == MODE_TRAINING_MENU || currentMode == MODE_SETTINGS_MENU)) {
-      // Back to main menu
-      currentMode = MODE_MAIN_MENU;
-      currentSelection = 0;
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
-      drawMenu();
-      return;
+    else if (key == KEY_ESC) {
+      if (currentMode == MODE_TRAINING_MENU || currentMode == MODE_SETTINGS_MENU) {
+        // Back to main menu
+        currentMode = MODE_MAIN_MENU;
+        currentSelection = 0;
+        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+        drawMenu();
+        return;
+      } else if (currentMode == MODE_MAIN_MENU) {
+        // In main menu - start tracking for long press to sleep
+        if (escPressStartTime == 0) {
+          escPressStartTime = millis();
+        }
+      }
     }
 
     if (redraw) {
@@ -640,7 +710,14 @@ void drawFooter() {
   int footerY = SCREEN_HEIGHT - 12;
   tft.setTextSize(1);
   tft.setTextColor(COLOR_WARNING); // Yellow
-  String helpText = "Navigate: Up/Down  |  Select: Enter";
+
+  String helpText;
+  if (currentMode == MODE_MAIN_MENU) {
+    helpText = "\x18\x19 Navigate  ENTER Select  Hold ESC Sleep";
+  } else {
+    helpText = "\x18\x19 Navigate  ENTER Select  ESC Back";
+  }
+
   int16_t x1, y1;
   uint16_t w, h;
   tft.getTextBounds(helpText, 0, 0, &x1, &y1, &w, &h);
