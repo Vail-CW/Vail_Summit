@@ -209,7 +209,12 @@ int handleCWSettingsInput(char key, Adafruit_ST7789 &display) {
     }
 
     if (changed) {
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      // Play tone preview if we're adjusting tone setting
+      if (cwSettingSelection == 1) {
+        tone(BUZZER_PIN, cwTone, 150);  // Play the new tone
+      } else {
+        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      }
       saveCWSettings();
       drawCWSettingsUI(display);
     }
@@ -241,7 +246,12 @@ int handleCWSettingsInput(char key, Adafruit_ST7789 &display) {
     }
 
     if (changed) {
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      // Play tone preview if we're adjusting tone setting
+      if (cwSettingSelection == 1) {
+        tone(BUZZER_PIN, cwTone, 150);  // Play the new tone
+      } else {
+        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      }
       saveCWSettings();
       drawCWSettingsUI(display);
     }
