@@ -283,9 +283,11 @@ All hardware settings are centralized in `config.h`:
 - [x] **CW Settings**
   - Adjustable speed (5-40 WPM)
   - Adjustable tone frequency (400-1200 Hz in 50 Hz steps)
+  - Tone preview: hear frequency as you adjust it
   - Key type selection (Straight Key, Iambic A, Iambic B)
   - Settings saved to flash memory
   - Persistent across reboots
+  - Modern card-based UI with rounded corners
 
 #### Connectivity
 - [x] **Vail Chat - Internet CW Repeater**

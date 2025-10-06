@@ -85,63 +85,69 @@ void drawCWSettingsUI(Adafruit_ST7789 &display) {
   // Clear screen (preserve header)
   display.fillRect(0, 42, SCREEN_WIDTH, SCREEN_HEIGHT - 42, COLOR_BACKGROUND);
 
-  // Title
-  display.setTextSize(1);
-  display.setTextColor(ST77XX_CYAN);
-  display.setCursor(10, 55);
-  display.print("CW Settings:");
+  // Modern card container
+  int cardX = 20;
+  int cardY = 55;
+  int cardW = SCREEN_WIDTH - 40;
+  int cardH = 150;
+
+  display.fillRoundRect(cardX, cardY, cardW, cardH, 12, 0x1082); // Dark blue fill
+  display.drawRoundRect(cardX, cardY, cardW, cardH, 12, 0x34BF); // Light blue outline
 
   // Setting 0: Speed (WPM)
-  int yPos = 80;
+  int yPos = cardY + 15;
   bool isSelected = (cwSettingSelection == 0);
 
   if (isSelected) {
-    display.fillRect(5, yPos - 2, SCREEN_WIDTH - 10, 28, 0x249F);
+    display.fillRoundRect(cardX + 8, yPos, cardW - 16, 38, 8, 0x249F); // Blue highlight
   }
+
+  display.setTextSize(1);
+  display.setTextColor(isSelected ? ST77XX_WHITE : 0x7BEF); // Light gray
+  display.setCursor(cardX + 15, yPos + 8);
+  display.print("Speed");
 
   display.setTextSize(2);
   display.setTextColor(isSelected ? ST77XX_WHITE : ST77XX_CYAN);
-  display.setCursor(10, yPos + 5);
-  display.print("Speed:");
-
-  display.setTextColor(isSelected ? ST77XX_WHITE : ST77XX_GREEN);
-  display.setCursor(140, yPos + 5);
+  display.setCursor(cardX + 15, yPos + 20);
   display.print(cwSpeed);
   display.print(" WPM");
 
   // Setting 1: Tone (Hz)
-  yPos += 35;
+  yPos += 45;
   isSelected = (cwSettingSelection == 1);
 
   if (isSelected) {
-    display.fillRect(5, yPos - 2, SCREEN_WIDTH - 10, 28, 0x249F);
+    display.fillRoundRect(cardX + 8, yPos, cardW - 16, 38, 8, 0x249F); // Blue highlight
   }
+
+  display.setTextSize(1);
+  display.setTextColor(isSelected ? ST77XX_WHITE : 0x7BEF); // Light gray
+  display.setCursor(cardX + 15, yPos + 8);
+  display.print("Tone");
 
   display.setTextSize(2);
   display.setTextColor(isSelected ? ST77XX_WHITE : ST77XX_CYAN);
-  display.setCursor(10, yPos + 5);
-  display.print("Tone:");
-
-  display.setTextColor(isSelected ? ST77XX_WHITE : ST77XX_GREEN);
-  display.setCursor(140, yPos + 5);
+  display.setCursor(cardX + 15, yPos + 20);
   display.print(cwTone);
   display.print(" Hz");
 
   // Setting 2: Key Type
-  yPos += 35;
+  yPos += 45;
   isSelected = (cwSettingSelection == 2);
 
   if (isSelected) {
-    display.fillRect(5, yPos - 2, SCREEN_WIDTH - 10, 28, 0x249F);
+    display.fillRoundRect(cardX + 8, yPos, cardW - 16, 38, 8, 0x249F); // Blue highlight
   }
+
+  display.setTextSize(1);
+  display.setTextColor(isSelected ? ST77XX_WHITE : 0x7BEF); // Light gray
+  display.setCursor(cardX + 15, yPos + 8);
+  display.print("Key Type");
 
   display.setTextSize(2);
   display.setTextColor(isSelected ? ST77XX_WHITE : ST77XX_CYAN);
-  display.setCursor(10, yPos + 5);
-  display.print("Key:");
-
-  display.setTextColor(isSelected ? ST77XX_WHITE : ST77XX_GREEN);
-  display.setCursor(140, yPos + 5);
+  display.setCursor(cardX + 15, yPos + 20);
   if (cwKeyType == KEY_STRAIGHT) {
     display.print("Straight");
   } else if (cwKeyType == KEY_IAMBIC_A) {
@@ -153,7 +159,7 @@ void drawCWSettingsUI(Adafruit_ST7789 &display) {
   // Draw footer instructions
   display.setTextSize(1);
   display.setTextColor(COLOR_WARNING);
-  String footerText = "Up/Down: Select  Left/Right: Adjust  ESC: Back";
+  String footerText = "\x18\x19 Select  \x1B\x1A Adjust  ESC Back";
 
   int16_t x1, y1;
   uint16_t w, h;

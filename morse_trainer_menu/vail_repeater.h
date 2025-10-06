@@ -114,6 +114,9 @@ int64_t getCurrentTimestamp() {
   return timestamp;
 }
 
+// Forward declaration of drawHeader (defined in main .ino file)
+void drawHeader();
+
 // Start Vail repeater mode
 void startVailRepeater(Adafruit_ST7789 &display) {
   vailState = VAIL_DISCONNECTED;
@@ -128,6 +131,9 @@ void startVailRepeater(Adafruit_ST7789 &display) {
   vailDitMemory = false;
   vailDahMemory = false;
   vailDitDuration = DIT_DURATION(cwSpeed);
+
+  // Redraw header with correct title
+  drawHeader();
 
   drawVailUI(display);
 }
