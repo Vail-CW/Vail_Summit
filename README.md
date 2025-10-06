@@ -316,7 +316,7 @@ All hardware settings are centralized in `config.h`:
 ### Deep Sleep Mode
 
 **How to enter sleep:**
-1. From the main menu, hold ESC for 3 seconds
+1. From the main menu, press ESC three times quickly (within 2 seconds)
 2. Device will beep and show "Going to Sleep..." message
 3. Screen turns off, device enters ultra-low power mode (~20µA)
 

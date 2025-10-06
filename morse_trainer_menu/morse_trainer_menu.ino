@@ -40,10 +40,10 @@ enum MenuMode {
 
 MenuMode currentMode = MODE_MAIN_MENU;
 
-// Deep sleep tracking
-unsigned long escPressStartTime = 0;
-bool escHeldForSleep = false;
-#define SLEEP_HOLD_TIME 3000  // 3 seconds to enter sleep
+// Deep sleep tracking (triple ESC press)
+int escPressCount = 0;
+unsigned long lastEscPressTime = 0;
+#define TRIPLE_ESC_TIMEOUT 2000  // 2 seconds window for 3 presses
 
 String mainMenuOptions[MENU_ITEMS] = {
   "Training",
@@ -231,25 +231,12 @@ void loop() {
 
     if (key != 0) {
       handleKeyPress(key);
-    } else {
-      // No key pressed - reset ESC timer
-      escPressStartTime = 0;
-      escHeldForSleep = false;
     }
-  } else {
-    // No key available - reset ESC timer
-    escPressStartTime = 0;
-    escHeldForSleep = false;
   }
 
-  // Check for long ESC press to enter deep sleep (only in main menu)
-  if (currentMode == MODE_MAIN_MENU && escPressStartTime > 0 && !escHeldForSleep) {
-    if (millis() - escPressStartTime >= SLEEP_HOLD_TIME) {
-      escHeldForSleep = true;
-      tone(BUZZER_PIN, TONE_STARTUP, 200);
-      delay(200);
-      enterDeepSleep();
-    }
+  // Reset ESC counter if timeout exceeded
+  if (escPressCount > 0 && (millis() - lastEscPressTime > TRIPLE_ESC_TIMEOUT)) {
+    escPressCount = 0;
   }
 
   delay(10);
@@ -399,9 +386,18 @@ void handleKeyPress(char key) {
         drawMenu();
         return;
       } else if (currentMode == MODE_MAIN_MENU) {
-        // In main menu - start tracking for long press to sleep
-        if (escPressStartTime == 0) {
-          escPressStartTime = millis();
+        // In main menu - count ESC presses for sleep (triple tap)
+        escPressCount++;
+        lastEscPressTime = millis();
+
+        if (escPressCount >= 3) {
+          // Triple ESC pressed - enter sleep
+          tone(BUZZER_PIN, TONE_STARTUP, 200);
+          delay(200);
+          enterDeepSleep();
+        } else {
+          // Beep for each press to give feedback
+          tone(BUZZER_PIN, TONE_MENU_NAV, 50);
         }
       }
     }
@@ -713,7 +709,7 @@ void drawFooter() {
 
   String helpText;
   if (currentMode == MODE_MAIN_MENU) {
-    helpText = "\x18\x19 Navigate  ENTER Select  Hold ESC Sleep";
+    helpText = "\x18\x19 Navigate  ENTER Select  ESC x3 Sleep";
   } else {
     helpText = "\x18\x19 Navigate  ENTER Select  ESC Back";
   }
