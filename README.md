@@ -99,20 +99,26 @@ MAX17048 I2C Address: 0x36  // Battery fuel gauge
 - `Adafruit_MAX1704X` - Battery monitoring
 - `Wire` - I2C communication
 - `WiFi` - WiFi functionality
+- `WiFiClientSecure` - Secure WiFi connections
 - `SPI` - SPI communication
+- `Preferences` - Non-volatile storage
+- `WebSockets` by Markus Sattler - WebSocket client
+- `ArduinoJson` by Benoit Blanchon - JSON parsing
 
 ### Key Features Implemented
 
 #### 1. Menu System
 - **Modern carousel/stack UI design**
 - Four menu options:
-  1. Training
-  2. Settings
-  3. WiFi
-  4. Bluetooth
+  1. Training (submenu with Hear It Type It, Practice)
+  2. Settings (submenu with WiFi Setup, CW Settings)
+  3. WiFi (Vail CW Repeater)
+  4. Bluetooth (coming soon)
 - Arrow key navigation (up/down)
 - Enter key to select
+- ESC key to go back
 - Visual feedback with card-based layout
+- Multi-level menu navigation
 
 #### 2. Status Bar
 - **WiFi indicator**: Green (connected) / Red (disconnected)
@@ -257,15 +263,51 @@ All hardware settings are centralized in `config.h`:
   - Attempt counter
   - Serial debug output for troubleshooting
 
+- [x] **Practice Oscillator Mode**
+  - Free-form morse code practice with paddle/key
+  - Uses configurable CW settings (speed, tone, key type)
+  - Real-time visual feedback showing paddle state
+  - Supports straight key, Iambic A, and Iambic B modes
+  - Proper inter-element spacing
+  - Local sidetone feedback
+
+#### Settings
+- [x] **WiFi Setup**
+  - Scan for available WiFi networks
+  - Connect to selected network with password
+  - Save WiFi credentials to flash memory
+  - Auto-connect on startup
+  - Display signal strength and encryption status
+
+- [x] **CW Settings**
+  - Adjustable speed (5-40 WPM)
+  - Adjustable tone frequency (400-1200 Hz in 50 Hz steps)
+  - Key type selection (Straight Key, Iambic A, Iambic B)
+  - Settings saved to flash memory
+  - Persistent across reboots
+
+#### Connectivity
+- [x] **Vail Chat - Internet CW Repeater**
+  - WebSocket connection to vail.woozle.org
+  - Real-time morse code transmission to internet
+  - Receive and playback morse code from other operators
+  - JSON protocol with clock synchronization
+  - Default channel: "General"
+  - Live channel switching (General, 1-10) with up/down arrows
+  - Live speed adjustment (5-40 WPM) with left/right arrows
+  - Echo filtering (don't play back own transmissions)
+  - Non-blocking playback state machine
+  - Immediate transmission (sends each tone as it's generated)
+  - Accurate timing with tone start timestamps
+  - Modern UI showing channel, status, speed, and operator count
+
 ### 🚧 Pending Features
 - [ ] Additional training modes (Koch method, character drills, etc.)
-- [ ] Settings menu (WPM adjustment, tone frequency, etc.)
-- [ ] WiFi configuration interface
 - [ ] Bluetooth connectivity
-- [ ] Iambic paddle input handling
 - [ ] Character recognition/decoding (decode mode)
 - [ ] Progress tracking and statistics
 - [ ] Deep sleep power management
+- [ ] Volume control
 
 ---
 
@@ -326,6 +368,8 @@ Setup complete!
 2. Adafruit ST7735 and ST7789 Library
 3. Adafruit MAX1704X
 4. Adafruit LC709203F (backup battery monitor support)
+5. WebSockets by Markus Sattler
+6. ArduinoJson by Benoit Blanchon
 
 ### Board Configuration
 - Board: **ESP32S3 Dev Module** or **Adafruit Feather ESP32-S3**
@@ -349,7 +393,12 @@ Project Jupiter/
 │   ├── morse_trainer_menu.ino        # Main program with menu system
 │   ├── config.h                      # Hardware configuration
 │   ├── morse_code.h                  # Morse code engine and lookup tables
-│   └── training_hear_it_type_it.h    # "Hear It Type It" training mode
+│   ├── training_hear_it_type_it.h    # "Hear It Type It" training mode
+│   ├── training_practice.h           # Practice oscillator mode
+│   ├── settings_wifi.h               # WiFi configuration and management
+│   ├── settings_cw.h                 # CW settings (speed, tone, key type)
+│   └── vail_repeater.h               # Vail CW repeater WebSocket client
+├── vail_web_repeater/                # Cloned Vail repeater source (reference)
 ├── ESP32-S3 Project Hardware Documentation.pdf
 └── README.md                         # This file
 ```
@@ -408,6 +457,96 @@ Project Jupiter/
 
 ---
 
+## Practice Mode
+
+**Purpose**: Free-form morse code practice using your iambic paddle or straight key.
+
+**How it works:**
+1. Navigate to Training → Practice from main menu
+2. Use your paddle/key to send morse code
+3. Hear local sidetone through the buzzer
+4. Practice at your configured speed and tone settings
+
+**Features:**
+- Uses saved CW settings (Settings → CW Settings)
+- Real-time visual feedback (green circle lights up when keying)
+- Supports three key types:
+  - **Straight Key**: Simple on/off keying using DIT pin
+  - **Iambic A**: Memory mode with manual alternation
+  - **Iambic B**: Automatic alternation with squeeze keying
+- Proper timing: 1 dit inter-element spacing
+- ESC to exit back to Training menu
+
+---
+
+## Vail Chat (Internet CW Repeater)
+
+**Purpose**: Practice morse code with other operators around the world via the internet.
+
+**How it works:**
+1. Connect to WiFi (Settings → WiFi Setup)
+2. Navigate to WiFi from main menu
+3. Automatically connects to Vail "General" channel
+4. Use your paddle to transmit - other operators hear you in real-time
+5. Hear other operators' transmissions through your buzzer
+6. Change channels and speed on-the-fly with arrow keys
+
+**Features:**
+- Secure WebSocket connection (WSS) to vail.woozle.org
+- Real-time bidirectional morse code
+- Clock synchronization with server
+- 500ms playback delay to handle network jitter
+- Immediate transmission (each tone sent as it's generated for real-time performance)
+- Accurate timing using tone start timestamps (matches web client behavior)
+- Echo filtering (your own transmissions aren't played back)
+- Shows connection status, current channel, speed, and operator count
+- Non-blocking playback (can transmit while receiving)
+- Live channel switching (General, 1-10)
+- Live speed adjustment (5-40 WPM)
+- Modern UI with rounded card design
+
+**Controls:**
+- **↑/↓ Arrows**: Change channel (General → 1 → 2 → ... → 10 → General)
+- **←/→ Arrows**: Adjust speed (5-40 WPM)
+- **Paddle**: Transmit morse code
+- **ESC**: Disconnect and exit
+
+**UI Display:**
+```
+┌─────────────────────────────────────┐
+│ VAIL CHAT            [WiFi] [Batt]  │
+├─────────────────────────────────────┤
+│  ╔═══════════════════════════════╗  │
+│  ║ Channel                       ║  │
+│  ║ General                       ║  │
+│  ║                               ║  │
+│  ║ Status                        ║  │
+│  ║ Connected                     ║  │
+│  ║                               ║  │
+│  ║ Speed      15 WPM    Ops   2  ║  │
+│  ╚═══════════════════════════════╝  │
+│                                     │
+│  Use paddle to transmit             │
+├─────────────────────────────────────┤
+│  ↑↓ Chan  ←→ Spd  ESC Exit          │
+└─────────────────────────────────────┘
+```
+
+**Protocol:**
+- Based on the Vail protocol (https://github.com/Vail-CW/vail_web_repeater)
+- JSON format over WebSocket with `json.vail.woozle.org` subprotocol
+- Transmission example: `{"Timestamp":1759710473428,"Clients":0,"Duration":[198]}`
+  - Timestamp: Unix epoch milliseconds (when tone started)
+  - Clients: Number of connected operators (0 when sending, server fills in)
+  - Duration: Array containing tone duration in milliseconds
+  - Each tone sent immediately as a separate message
+  - Silences are implicit (gaps between tones)
+- Reception messages contain alternating tone/silence arrays
+  - Even indices (0, 2, 4...) = tone durations
+  - Odd indices (1, 3, 5...) = silence durations
+
+---
+
 ## Future Enhancements
 
 ### Training Features
@@ -452,4 +591,4 @@ This project is for educational and personal use.
 
 ---
 
-*Last Updated: 2025-10-05*
+*Last Updated: 2025-01-05*

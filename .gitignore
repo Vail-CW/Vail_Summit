@@ -1,6 +1,9 @@
 # Claude Code settings
 .claude/
 
+# Vail web repeater reference (cloned repo, not part of this project)
+vail_web_repeater/
+
 # Arduino build artifacts
 *.hex
 *.elf

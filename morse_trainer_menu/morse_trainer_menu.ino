@@ -10,6 +10,10 @@
 #include <Adafruit_MAX1704X.h>
 #include "morse_code.h"
 #include "training_hear_it_type_it.h"
+#include "settings_wifi.h"
+#include "settings_cw.h"
+#include "training_practice.h"
+#include "vail_repeater.h"
 
 // Battery monitor (one of these will be present)
 Adafruit_LC709203F lc;
@@ -26,8 +30,11 @@ enum MenuMode {
   MODE_MAIN_MENU,
   MODE_TRAINING_MENU,
   MODE_HEAR_IT_TYPE_IT,
-  MODE_SETTINGS,
-  MODE_WIFI,
+  MODE_PRACTICE,
+  MODE_SETTINGS_MENU,
+  MODE_WIFI_SETTINGS,
+  MODE_CW_SETTINGS,
+  MODE_VAIL_REPEATER,
   MODE_BLUETOOTH
 };
 
@@ -48,13 +55,27 @@ String mainMenuIcons[MENU_ITEMS] = {
 };
 
 // Training submenu
-#define TRAINING_MENU_ITEMS 1
+#define TRAINING_MENU_ITEMS 2
 String trainingMenuOptions[TRAINING_MENU_ITEMS] = {
-  "Hear It Type It"
+  "Hear It Type It",
+  "Practice"
 };
 
 String trainingMenuIcons[TRAINING_MENU_ITEMS] = {
-  "H"  // Hear It Type It
+  "H",  // Hear It Type It
+  "P"   // Practice
+};
+
+// Settings submenu
+#define SETTINGS_MENU_ITEMS 2
+String settingsMenuOptions[SETTINGS_MENU_ITEMS] = {
+  "WiFi Setup",
+  "CW Settings"
+};
+
+String settingsMenuIcons[SETTINGS_MENU_ITEMS] = {
+  "W",  // WiFi Setup
+  "C"   // CW Settings
 };
 
 int currentSelection = 0;
@@ -136,11 +157,14 @@ void setup() {
     }
   }
 
-  // Initialize WiFi (set to station mode but don't connect)
+  // Initialize WiFi and attempt auto-connect
   Serial.println("Initializing WiFi...");
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
+  autoConnectWiFi();
   Serial.println("WiFi initialized");
+
+  // Load CW settings from preferences
+  Serial.println("Loading CW settings...");
+  loadCWSettings();
 
   // Ensure backlight is still on
   ledcWrite(TFT_BL, 255);
@@ -169,6 +193,29 @@ void loop() {
     // Redraw status icons with new data
     drawStatusIcons();
     lastStatusUpdate = millis();
+  }
+
+  // Update practice oscillator if in practice mode
+  if (currentMode == MODE_PRACTICE) {
+    static bool lastDitState = false;
+    static bool lastDahState = false;
+
+    updatePracticeOscillator();
+
+    // Update visual feedback if paddle state changed
+    bool currentDit = digitalRead(DIT_PIN) == PADDLE_ACTIVE;
+    bool currentDah = digitalRead(DAH_PIN) == PADDLE_ACTIVE;
+
+    if (currentDit != lastDitState || currentDah != lastDahState) {
+      drawPracticeStats(tft);
+      lastDitState = currentDit;
+      lastDahState = currentDah;
+    }
+  }
+
+  // Update Vail repeater if in Vail mode
+  if (currentMode == MODE_VAIL_REPEATER) {
+    updateVailRepeater(tft);
   }
 
   // Check for keyboard input
@@ -201,9 +248,66 @@ void handleKeyPress(char key) {
     return;
   }
 
-  // Menu navigation (for MAIN_MENU and TRAINING_MENU)
-  if (currentMode == MODE_MAIN_MENU || currentMode == MODE_TRAINING_MENU) {
-    int maxItems = (currentMode == MODE_MAIN_MENU) ? MENU_ITEMS : TRAINING_MENU_ITEMS;
+  // Handle WiFi settings mode
+  if (currentMode == MODE_WIFI_SETTINGS) {
+    int result = handleWiFiInput(key, tft);
+    if (result == -1) {
+      // Exit WiFi settings, back to settings menu
+      currentMode = MODE_SETTINGS_MENU;
+      currentSelection = 0;
+      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      drawMenu();
+    } else if (result == 2) {
+      // Full redraw requested
+      drawWiFiUI(tft);
+    }
+    return;
+  }
+
+  // Handle CW settings mode
+  if (currentMode == MODE_CW_SETTINGS) {
+    int result = handleCWSettingsInput(key, tft);
+    if (result == -1) {
+      // Exit CW settings, back to settings menu
+      currentMode = MODE_SETTINGS_MENU;
+      currentSelection = 0;
+      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      drawMenu();
+    }
+    return;
+  }
+
+  // Handle Practice mode
+  if (currentMode == MODE_PRACTICE) {
+    int result = handlePracticeInput(key, tft);
+    if (result == -1) {
+      // Exit practice mode, back to training menu
+      currentMode = MODE_TRAINING_MENU;
+      currentSelection = 0;
+      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      drawMenu();
+    }
+    return;
+  }
+
+  // Handle Vail repeater mode
+  if (currentMode == MODE_VAIL_REPEATER) {
+    int result = handleVailInput(key, tft);
+    if (result == -1) {
+      // Exit Vail mode, back to main menu
+      currentMode = MODE_MAIN_MENU;
+      currentSelection = 0;
+      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      drawMenu();
+    }
+    return;
+  }
+
+  // Menu navigation (for MAIN_MENU, TRAINING_MENU, and SETTINGS_MENU)
+  if (currentMode == MODE_MAIN_MENU || currentMode == MODE_TRAINING_MENU || currentMode == MODE_SETTINGS_MENU) {
+    int maxItems = MENU_ITEMS;
+    if (currentMode == MODE_TRAINING_MENU) maxItems = TRAINING_MENU_ITEMS;
+    if (currentMode == MODE_SETTINGS_MENU) maxItems = SETTINGS_MENU_ITEMS;
 
     // Arrow key navigation
     if (key == KEY_UP) {
@@ -223,7 +327,7 @@ void handleKeyPress(char key) {
     else if (key == KEY_ENTER || key == KEY_ENTER_ALT) {
       selectMenuItem();
     }
-    else if (key == KEY_ESC && currentMode == MODE_TRAINING_MENU) {
+    else if (key == KEY_ESC && (currentMode == MODE_TRAINING_MENU || currentMode == MODE_SETTINGS_MENU)) {
       // Back to main menu
       currentMode = MODE_MAIN_MENU;
       currentSelection = 0;
@@ -237,6 +341,8 @@ void handleKeyPress(char key) {
         drawMenuItems(mainMenuOptions, mainMenuIcons, MENU_ITEMS);
       } else if (currentMode == MODE_TRAINING_MENU) {
         drawMenuItems(trainingMenuOptions, trainingMenuIcons, TRAINING_MENU_ITEMS);
+      } else if (currentMode == MODE_SETTINGS_MENU) {
+        drawMenuItems(settingsMenuOptions, settingsMenuIcons, SETTINGS_MENU_ITEMS);
       }
     }
   }
@@ -256,6 +362,16 @@ void drawHeader() {
     title = "TRAINING";
   } else if (currentMode == MODE_HEAR_IT_TYPE_IT) {
     title = "TRAINING";
+  } else if (currentMode == MODE_PRACTICE) {
+    title = "PRACTICE";
+  } else if (currentMode == MODE_SETTINGS_MENU) {
+    title = "SETTINGS";
+  } else if (currentMode == MODE_WIFI_SETTINGS) {
+    title = "WIFI SETUP";
+  } else if (currentMode == MODE_CW_SETTINGS) {
+    title = "CW SETTINGS";
+  } else if (currentMode == MODE_VAIL_REPEATER) {
+    title = "VAIL CHAT";  // Also updates header
   }
 
   tft.setCursor(10, 27); // Left-justified
@@ -276,7 +392,7 @@ void drawMenu() {
   drawHeader();
 
   // Draw footer (only for menu modes)
-  if (currentMode == MODE_MAIN_MENU || currentMode == MODE_TRAINING_MENU) {
+  if (currentMode == MODE_MAIN_MENU || currentMode == MODE_TRAINING_MENU || currentMode == MODE_SETTINGS_MENU) {
     drawFooter();
   }
 
@@ -285,8 +401,18 @@ void drawMenu() {
     drawMenuItems(mainMenuOptions, mainMenuIcons, MENU_ITEMS);
   } else if (currentMode == MODE_TRAINING_MENU) {
     drawMenuItems(trainingMenuOptions, trainingMenuIcons, TRAINING_MENU_ITEMS);
+  } else if (currentMode == MODE_SETTINGS_MENU) {
+    drawMenuItems(settingsMenuOptions, settingsMenuIcons, SETTINGS_MENU_ITEMS);
   } else if (currentMode == MODE_HEAR_IT_TYPE_IT) {
     drawHearItTypeItUI(tft);
+  } else if (currentMode == MODE_PRACTICE) {
+    drawPracticeUI(tft);
+  } else if (currentMode == MODE_WIFI_SETTINGS) {
+    drawWiFiUI(tft);
+  } else if (currentMode == MODE_CW_SETTINGS) {
+    drawCWSettingsUI(tft);
+  } else if (currentMode == MODE_VAIL_REPEATER) {
+    drawVailUI(tft);
   }
 }
 
@@ -541,23 +667,31 @@ void selectMenuItem() {
 
     } else if (currentSelection == 1) {
       // Settings
-      tft.fillScreen(COLOR_BACKGROUND);
-      tft.setTextSize(2);
-      tft.setTextColor(ST77XX_WHITE);
-      tft.setCursor(50, 100);
-      tft.print("Settings coming soon");
-      delay(1500);
+      currentMode = MODE_SETTINGS_MENU;
+      currentSelection = 0;
       drawMenu();
 
     } else if (currentSelection == 2) {
-      // WiFi
-      tft.fillScreen(COLOR_BACKGROUND);
-      tft.setTextSize(2);
-      tft.setTextColor(ST77XX_WHITE);
-      tft.setCursor(50, 100);
-      tft.print("WiFi coming soon");
-      delay(1500);
-      drawMenu();
+      // WiFi (Vail Repeater)
+      if (WiFi.status() != WL_CONNECTED) {
+        // Not connected to WiFi
+        tft.fillScreen(COLOR_BACKGROUND);
+        tft.setTextSize(2);
+        tft.setTextColor(ST77XX_RED);
+        tft.setCursor(30, 100);
+        tft.print("Connect WiFi");
+        tft.setTextSize(1);
+        tft.setTextColor(ST77XX_WHITE);
+        tft.setCursor(20, 130);
+        tft.print("Settings > WiFi Setup");
+        delay(2000);
+        drawMenu();
+      } else {
+        // Connected to WiFi, start Vail repeater
+        currentMode = MODE_VAIL_REPEATER;
+        startVailRepeater(tft);
+        connectToVail(vailChannel);  // Use default channel
+      }
 
     } else if (currentSelection == 3) {
       // Bluetooth
@@ -583,6 +717,23 @@ void selectMenuItem() {
       delay(1000); // Brief pause before starting
       playCurrentCallsign();
       drawHearItTypeItUI(tft);
+    } else if (currentSelection == 1) {
+      // Practice
+      currentMode = MODE_PRACTICE;
+      startPracticeMode(tft);
+    }
+  } else if (currentMode == MODE_SETTINGS_MENU) {
+    selectedItem = settingsMenuOptions[currentSelection];
+
+    // Handle settings menu selections
+    if (currentSelection == 0) {
+      // WiFi Setup
+      currentMode = MODE_WIFI_SETTINGS;
+      startWiFiSettings(tft);
+    } else if (currentSelection == 1) {
+      // CW Settings
+      currentMode = MODE_CW_SETTINGS;
+      startCWSettings(tft);
     }
   }
 }
