@@ -40,9 +40,18 @@
 #define KEY_TAB     0x09  // Tab (Fn+Space)
 
 // ============================================
-// Buzzer - PWM Output
+// Buzzer - PWM Output (Legacy - now using I2S amplifier)
 // ============================================
-#define BUZZER_PIN  5     // PWM output for buzzer
+#define BUZZER_PIN  5     // PWM output for buzzer (deprecated)
+
+// ============================================
+// I2S Audio - MAX98357A Class-D Amplifier
+// ============================================
+#define I2S_BCK_PIN     14    // I2S Bit Clock (BCLK)
+#define I2S_LCK_PIN     15    // I2S Left/Right Clock (LRC/WS)
+#define I2S_DATA_PIN    16    // I2S Data Output (DIN)
+// MAX98357A GAIN pin: Float for 9dB (default), GND for 12dB, VIN for 6dB
+// SD (shutdown) pin: Leave floating for always-on
 
 // Audio Settings
 #define TONE_SIDETONE   700   // Hz - Morse code audio tone
@@ -54,6 +63,15 @@
 #define BEEP_SHORT      30    // ms - Short beep duration
 #define BEEP_MEDIUM     100   // ms - Medium beep duration
 #define BEEP_LONG       200   // ms - Long beep duration
+
+// I2S Audio Configuration
+#define I2S_SAMPLE_RATE 44100 // 44.1kHz sample rate
+#define I2S_BUFFER_SIZE 256   // Total samples (128 stereo pairs = 256 int16 values)
+
+// Volume Control
+#define DEFAULT_VOLUME  50    // Default volume (0-100%)
+#define VOLUME_MIN      0     // Minimum volume
+#define VOLUME_MAX      100   // Maximum volume
 
 // ============================================
 // Iambic Paddle Key - Digital Inputs
@@ -69,8 +87,8 @@
 // Battery Monitoring
 // ============================================
 // ESP32-S3 Feather V2: Uses MAX17048 I2C fuel gauge at 0x36
-// USB detection on dedicated USB pin
-#define USB_DETECT_PIN  A3    // USB voltage detection pin (BAT pin is A13)
+// USB detection - DISABLED because A3 conflicts with I2S_LCK_PIN (GPIO 15)
+// #define USB_DETECT_PIN  A3    // CONFLICT WITH I2S! Do not use!
 
 // Battery voltage thresholds (for LiPo)
 #define VBAT_FULL   4.2   // Fully charged voltage

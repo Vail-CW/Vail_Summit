@@ -176,7 +176,7 @@ int handleCWSettingsInput(char key, Adafruit_ST7789 &display) {
   if (key == KEY_UP) {
     if (cwSettingSelection > 0) {
       cwSettingSelection--;
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      beep(TONE_MENU_NAV, BEEP_SHORT);
       drawCWSettingsUI(display);
     }
     return 1;
@@ -184,7 +184,7 @@ int handleCWSettingsInput(char key, Adafruit_ST7789 &display) {
   else if (key == KEY_DOWN) {
     if (cwSettingSelection < CW_SETTINGS_COUNT - 1) {
       cwSettingSelection++;
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      beep(TONE_MENU_NAV, BEEP_SHORT);
       drawCWSettingsUI(display);
     }
     return 1;
@@ -217,9 +217,9 @@ int handleCWSettingsInput(char key, Adafruit_ST7789 &display) {
     if (changed) {
       // Play tone preview if we're adjusting tone setting
       if (cwSettingSelection == 1) {
-        tone(BUZZER_PIN, cwTone, 150);  // Play the new tone
+        beep(cwTone, 150);  // Play the new tone
       } else {
-        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+        beep(TONE_MENU_NAV, BEEP_SHORT);
       }
       saveCWSettings();
       drawCWSettingsUI(display);
@@ -254,9 +254,9 @@ int handleCWSettingsInput(char key, Adafruit_ST7789 &display) {
     if (changed) {
       // Play tone preview if we're adjusting tone setting
       if (cwSettingSelection == 1) {
-        tone(BUZZER_PIN, cwTone, 150);  // Play the new tone
+        beep(cwTone, 150);  // Play the new tone
       } else {
-        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+        beep(TONE_MENU_NAV, BEEP_SHORT);
       }
       saveCWSettings();
       drawCWSettingsUI(display);

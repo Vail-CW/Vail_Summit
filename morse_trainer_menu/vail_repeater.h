@@ -346,7 +346,7 @@ void vailStraightKeyHandler() {
     vailTxToneOn = true;
     vailTxElementStart = millis();
     vailTxDurations.clear();
-    tone(BUZZER_PIN, cwTone);
+    startTone(cwTone);
   }
 
   if (vailIsTransmitting) {
@@ -358,9 +358,9 @@ void vailStraightKeyHandler() {
       vailTxToneOn = ditPressed;
 
       if (ditPressed) {
-        tone(BUZZER_PIN, cwTone);
+        startTone(cwTone);
       } else {
-        noTone(BUZZER_PIN);
+        stopTone();
       }
     }
 
@@ -371,7 +371,7 @@ void vailStraightKeyHandler() {
       sendVailMessage(vailTxDurations);
       vailIsTransmitting = false;
       vailTxDurations.clear();
-      noTone(BUZZER_PIN);
+      stopTone();
     }
   }
 }
@@ -390,7 +390,7 @@ void vailIambicKeyerHandler() {
       vailInSpacing = false;
       vailElementStartTime = currentTime;
       vailToneStartTimestamp = getCurrentTimestamp();  // Capture when tone starts
-      tone(BUZZER_PIN, cwTone);
+      startTone(cwTone);
 
       // Start new transmission if needed
       if (!vailIsTransmitting) {
@@ -409,7 +409,7 @@ void vailIambicKeyerHandler() {
       vailInSpacing = false;
       vailElementStartTime = currentTime;
       vailToneStartTimestamp = getCurrentTimestamp();  // Capture when tone starts
-      tone(BUZZER_PIN, cwTone);
+      startTone(cwTone);
 
       // Start new transmission if needed
       if (!vailIsTransmitting) {
@@ -451,7 +451,7 @@ void vailIambicKeyerHandler() {
       sendVailMessage({(uint16_t)elementDuration}, vailToneStartTimestamp);
 
       // Element complete, turn off tone and start spacing
-      noTone(BUZZER_PIN);
+      stopTone();
       vailKeyerActive = false;
       vailSendingDit = false;
       vailSendingDah = false;
@@ -515,7 +515,7 @@ void playbackMessages() {
   if (vailIsTransmitting) {
     if (isPlaying) {
       // Stop playback if we started transmitting
-      noTone(BUZZER_PIN);
+      stopTone();
       isPlaying = false;
     }
     return;
@@ -549,7 +549,7 @@ void playbackMessages() {
       if (msg.durations.size() > 0) {
         Serial.print("First element duration: ");
         Serial.println(msg.durations[0]);
-        tone(BUZZER_PIN, cwTone);  // First element is always a tone
+        startTone(cwTone);  // First element is always a tone
       }
     }
   }
@@ -566,7 +566,7 @@ void playbackMessages() {
 
       if (playbackIndex >= msg.durations.size()) {
         // Message complete
-        noTone(BUZZER_PIN);
+        stopTone();
         isPlaying = false;
         playbackIndex = 0;
         rxQueue.erase(rxQueue.begin());
@@ -584,11 +584,11 @@ void playbackMessages() {
         if (playbackIndex % 2 == 0) {
           // Even index = tone
           Serial.println("TONE");
-          tone(BUZZER_PIN, cwTone);
+          startTone(cwTone);
         } else {
           // Odd index = silence
           Serial.println("SILENCE");
-          noTone(BUZZER_PIN);
+          stopTone();
         }
       }
     }
@@ -712,7 +712,7 @@ int handleVailInput(char key, Adafruit_ST7789 &display) {
     disconnectFromVail();
     connectToVail(vailChannel);
     needsUIRedraw = true;
-    tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+    beep(TONE_MENU_NAV, BEEP_SHORT);
     return 0;
   }
 
@@ -733,7 +733,7 @@ int handleVailInput(char key, Adafruit_ST7789 &display) {
     disconnectFromVail();
     connectToVail(vailChannel);
     needsUIRedraw = true;
-    tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+    beep(TONE_MENU_NAV, BEEP_SHORT);
     return 0;
   }
 
@@ -744,7 +744,7 @@ int handleVailInput(char key, Adafruit_ST7789 &display) {
       vailDitDuration = DIT_DURATION(cwSpeed);
       saveCWSettings();
       needsUIRedraw = true;
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      beep(TONE_MENU_NAV, BEEP_SHORT);
     }
     return 0;
   }
@@ -755,7 +755,7 @@ int handleVailInput(char key, Adafruit_ST7789 &display) {
       vailDitDuration = DIT_DURATION(cwSpeed);
       saveCWSettings();
       needsUIRedraw = true;
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      beep(TONE_MENU_NAV, BEEP_SHORT);
     }
     return 0;
   }

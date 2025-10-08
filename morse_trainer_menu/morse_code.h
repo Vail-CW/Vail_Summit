@@ -109,14 +109,12 @@ struct MorseTiming {
 // Play a single dit or dah
 void playDit(int wpm, int toneFreq = TONE_SIDETONE) {
   int duration = DIT_DURATION(wpm);
-  tone(BUZZER_PIN, toneFreq, duration);
-  delay(duration);
+  playTone(toneFreq, duration);
 }
 
 void playDah(int wpm, int toneFreq = TONE_SIDETONE) {
   int duration = DIT_DURATION(wpm) * 3;
-  tone(BUZZER_PIN, toneFreq, duration);
-  delay(duration);
+  playTone(toneFreq, duration);
 }
 
 // Play morse code pattern for a single character

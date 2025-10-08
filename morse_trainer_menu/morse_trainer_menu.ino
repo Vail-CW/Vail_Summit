@@ -8,10 +8,12 @@
 #include <Fonts/FreeSans9pt7b.h>
 #include <Adafruit_LC709203F.h>
 #include <Adafruit_MAX1704X.h>
+#include "i2s_audio.h"
 #include "morse_code.h"
 #include "training_hear_it_type_it.h"
 #include "settings_wifi.h"
 #include "settings_cw.h"
+#include "settings_volume.h"
 #include "training_practice.h"
 #include "vail_repeater.h"
 
@@ -34,6 +36,7 @@ enum MenuMode {
   MODE_SETTINGS_MENU,
   MODE_WIFI_SETTINGS,
   MODE_CW_SETTINGS,
+  MODE_VOLUME_SETTINGS,
   MODE_VAIL_REPEATER,
   MODE_BLUETOOTH
 };
@@ -72,15 +75,17 @@ String trainingMenuIcons[TRAINING_MENU_ITEMS] = {
 };
 
 // Settings submenu
-#define SETTINGS_MENU_ITEMS 2
+#define SETTINGS_MENU_ITEMS 3
 String settingsMenuOptions[SETTINGS_MENU_ITEMS] = {
   "WiFi Setup",
-  "CW Settings"
+  "CW Settings",
+  "Volume"
 };
 
 String settingsMenuIcons[SETTINGS_MENU_ITEMS] = {
   "W",  // WiFi Setup
-  "C"   // CW Settings
+  "C",  // CW Settings
+  "V"   // Volume
 };
 
 int currentSelection = 0;
@@ -104,27 +109,32 @@ void setup() {
   delay(50);
   Serial.println("Backlight ON");
 
-  // Initialize LCD
+  // Initialize I2C first (before display to avoid conflicts)
+  Serial.println("Initializing I2C...");
+  Wire.begin(I2C_SDA, I2C_SCL);
+  delay(100);
+
+  // Initialize I2S Audio BEFORE display (critical for DMA priority)
+  Serial.println("\nInitializing I2S audio...");
+  initI2SAudio();
+  delay(100);
+
+  // Initialize LCD (after I2S to avoid DMA conflicts)
   Serial.println("Initializing display...");
   tft.init(240, 320);  // Initialize with hardware dimensions
   tft.setRotation(SCREEN_ROTATION);  // Then rotate to landscape
   tft.fillScreen(COLOR_BACKGROUND);
   Serial.println("Display initialized");
 
-  // Initialize I2C for CardKB
-  Serial.println("Initializing I2C...");
-  Wire.begin(I2C_SDA, I2C_SCL);
-  delay(100);
-
-  // Initialize Buzzer
-  pinMode(BUZZER_PIN, OUTPUT);
+  // DO NOT initialize buzzer pin - conflicts with I2S
+  // pinMode(BUZZER_PIN, OUTPUT);
 
   // Initialize Paddle
   pinMode(DIT_PIN, INPUT_PULLUP);
   pinMode(DAH_PIN, INPUT_PULLUP);
 
-  // Initialize USB detection pin
-  pinMode(USB_DETECT_PIN, INPUT);
+  // USB detection disabled - A3 conflicts with I2S_LCK_PIN
+  // pinMode(USB_DETECT_PIN, INPUT);
 
   // Initialize battery monitoring (I2C chip)
   Serial.println("Initializing battery monitor...");
@@ -186,14 +196,24 @@ void setup() {
   ledcWrite(TFT_BL, 255);
   Serial.println("Setup complete!");
 
-  // Startup beep
-  tone(BUZZER_PIN, TONE_STARTUP, BEEP_MEDIUM);
+  // Startup beep (test I2S audio)
+  Serial.println("\nTesting I2S audio output...");
+  Serial.println("You should hear a 1000 Hz beep now");
+  beep(TONE_STARTUP, BEEP_MEDIUM);
+  delay(200);
+
+  // Second test beep
+  Serial.println("Second test beep at 700 Hz");
+  beep(700, 300);
+  Serial.println("Audio test complete\n");
 }
 
 void loop() {
-  // Update status periodically
+  // Update status periodically (NEVER during practice mode to avoid audio interference)
   static unsigned long lastStatusUpdate = 0;
-  if (millis() - lastStatusUpdate > 5000) { // Update every 5 seconds
+  if (currentMode != MODE_PRACTICE &&
+      currentMode != MODE_HEAR_IT_TYPE_IT &&
+      millis() - lastStatusUpdate > 5000) { // Update every 5 seconds
     updateStatus();
     // Redraw status icons with new data
     drawStatusIcons();
@@ -202,20 +222,9 @@ void loop() {
 
   // Update practice oscillator if in practice mode
   if (currentMode == MODE_PRACTICE) {
-    static bool lastDitState = false;
-    static bool lastDahState = false;
-
+    // Call this frequently to keep audio buffer filled
+    // No display updates during practice to maximize audio performance
     updatePracticeOscillator();
-
-    // Update visual feedback if paddle state changed
-    bool currentDit = digitalRead(DIT_PIN) == PADDLE_ACTIVE;
-    bool currentDah = digitalRead(DAH_PIN) == PADDLE_ACTIVE;
-
-    if (currentDit != lastDitState || currentDah != lastDahState) {
-      drawPracticeStats(tft);
-      lastDitState = currentDit;
-      lastDahState = currentDah;
-    }
   }
 
   // Update Vail repeater if in Vail mode
@@ -223,15 +232,21 @@ void loop() {
     updateVailRepeater(tft);
   }
 
-  // Check for keyboard input
-  Wire.requestFrom(CARDKB_ADDR, 1);
+  // Check for keyboard input (reduce I2C polling frequency during practice mode)
+  static unsigned long lastKeyCheck = 0;
+  unsigned long keyCheckInterval = (currentMode == MODE_PRACTICE) ? 50 : 10; // Slower polling in practice
 
-  if (Wire.available()) {
-    char key = Wire.read();
+  if (millis() - lastKeyCheck >= keyCheckInterval) {
+    Wire.requestFrom(CARDKB_ADDR, 1);
 
-    if (key != 0) {
-      handleKeyPress(key);
+    if (Wire.available()) {
+      char key = Wire.read();
+
+      if (key != 0) {
+        handleKeyPress(key);
+      }
     }
+    lastKeyCheck = millis();
   }
 
   // Reset ESC counter if timeout exceeded
@@ -239,7 +254,8 @@ void loop() {
     escPressCount = 0;
   }
 
-  delay(10);
+  // Minimal delay in practice mode for better audio performance
+  delay((currentMode == MODE_PRACTICE) ? 1 : 10);
 }
 
 void enterDeepSleep() {
@@ -305,7 +321,7 @@ void handleKeyPress(char key) {
       // Exit WiFi settings, back to settings menu
       currentMode = MODE_SETTINGS_MENU;
       currentSelection = 0;
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      beep(TONE_MENU_NAV, BEEP_SHORT);
       drawMenu();
     } else if (result == 2) {
       // Full redraw requested
@@ -321,7 +337,20 @@ void handleKeyPress(char key) {
       // Exit CW settings, back to settings menu
       currentMode = MODE_SETTINGS_MENU;
       currentSelection = 0;
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      beep(TONE_MENU_NAV, BEEP_SHORT);
+      drawMenu();
+    }
+    return;
+  }
+
+  // Handle Volume settings mode
+  if (currentMode == MODE_VOLUME_SETTINGS) {
+    int result = handleVolumeInput(key, tft);
+    if (result == -1) {
+      // Exit volume settings, back to settings menu
+      currentMode = MODE_SETTINGS_MENU;
+      currentSelection = 0;
+      beep(TONE_MENU_NAV, BEEP_SHORT);
       drawMenu();
     }
     return;
@@ -334,7 +363,7 @@ void handleKeyPress(char key) {
       // Exit practice mode, back to training menu
       currentMode = MODE_TRAINING_MENU;
       currentSelection = 0;
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      beep(TONE_MENU_NAV, BEEP_SHORT);
       drawMenu();
     }
     return;
@@ -347,7 +376,7 @@ void handleKeyPress(char key) {
       // Exit Vail mode, back to main menu
       currentMode = MODE_MAIN_MENU;
       currentSelection = 0;
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      beep(TONE_MENU_NAV, BEEP_SHORT);
       drawMenu();
     }
     return;
@@ -364,14 +393,14 @@ void handleKeyPress(char key) {
       if (currentSelection > 0) {
         currentSelection--;
         redraw = true;
-        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+        beep(TONE_MENU_NAV, BEEP_SHORT);
       }
     }
     else if (key == KEY_DOWN) {
       if (currentSelection < maxItems - 1) {
         currentSelection++;
         redraw = true;
-        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+        beep(TONE_MENU_NAV, BEEP_SHORT);
       }
     }
     else if (key == KEY_ENTER || key == KEY_ENTER_ALT) {
@@ -382,7 +411,7 @@ void handleKeyPress(char key) {
         // Back to main menu
         currentMode = MODE_MAIN_MENU;
         currentSelection = 0;
-        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+        beep(TONE_MENU_NAV, BEEP_SHORT);
         drawMenu();
         return;
       } else if (currentMode == MODE_MAIN_MENU) {
@@ -392,12 +421,11 @@ void handleKeyPress(char key) {
 
         if (escPressCount >= 3) {
           // Triple ESC pressed - enter sleep
-          tone(BUZZER_PIN, TONE_STARTUP, 200);
-          delay(200);
+          beep(TONE_STARTUP, 200);
           enterDeepSleep();
         } else {
           // Beep for each press to give feedback
-          tone(BUZZER_PIN, TONE_MENU_NAV, 50);
+          beep(TONE_MENU_NAV, 50);
         }
       }
     }
@@ -436,6 +464,8 @@ void drawHeader() {
     title = "WIFI SETUP";
   } else if (currentMode == MODE_CW_SETTINGS) {
     title = "CW SETTINGS";
+  } else if (currentMode == MODE_VOLUME_SETTINGS) {
+    title = "VOLUME";
   } else if (currentMode == MODE_VAIL_REPEATER) {
     title = "VAIL CHAT";  // Also updates header
   }
@@ -477,6 +507,8 @@ void drawMenu() {
     drawWiFiUI(tft);
   } else if (currentMode == MODE_CW_SETTINGS) {
     drawCWSettingsUI(tft);
+  } else if (currentMode == MODE_VOLUME_SETTINGS) {
+    drawVolumeDisplay(tft);
   } else if (currentMode == MODE_VAIL_REPEATER) {
     drawVailUI(tft);
   }
@@ -673,20 +705,10 @@ void updateStatus() {
   if (batteryPercent > 100) batteryPercent = 100;
   if (batteryPercent < 0) batteryPercent = 0;
 
-  // Detect USB power using the USB detection pin
-  // The Feather has a USB pin that provides voltage when USB is connected
-  int usbReading = analogRead(USB_DETECT_PIN);
-
-  // If we detect voltage on USB pin, USB power is connected
-  // This is more reliable than trying to infer from battery voltage
-  if (usbReading > 500) {  // Threshold for USB presence (adjust if needed)
-    isCharging = true;
-    Serial.print("USB detected (ADC: ");
-    Serial.print(usbReading);
-    Serial.println(")");
-  } else {
-    isCharging = false;
-  }
+  // USB detection DISABLED - A3 conflicts with I2S_LCK_PIN (GPIO 15)
+  // Cannot use analogRead on GPIO 15 or it breaks I2S audio!
+  // Assume not charging for now (could use battery voltage trend instead)
+  isCharging = false;
 
   // Debug output
   if (DEBUG_ENABLED) {
@@ -724,7 +746,7 @@ void drawFooter() {
 
 void selectMenuItem() {
   // Play confirmation beep
-  tone(BUZZER_PIN, TONE_SELECT, BEEP_MEDIUM);
+  beep(TONE_SELECT, BEEP_MEDIUM);
 
   String selectedItem;
 
@@ -807,6 +829,10 @@ void selectMenuItem() {
       // CW Settings
       currentMode = MODE_CW_SETTINGS;
       startCWSettings(tft);
+    } else if (currentSelection == 2) {
+      // Volume Settings
+      currentMode = MODE_VOLUME_SETTINGS;
+      initVolumeSettings(tft);
     }
   }
 }

@@ -33,8 +33,11 @@ VAIL SUMMIT is a portable morse code training device built on the ESP32-S3 Feath
   - Dit (tip) and Dah (ring) inputs
 
 ### Audio Output
-- **Buzzer**
-  - PWM-driven piezo buzzer
+- **MAX98357A I2S Class-D Amplifier**
+  - 3W mono amplifier
+  - High-quality digital audio via I2S interface
+  - Software volume control (0-100%)
+  - Speaker and headphone output with automatic switching
   - Multiple tone frequencies for different UI events
 
 ### Power
@@ -69,15 +72,32 @@ DIT_PIN     = 6     // Dit paddle (active LOW with pullup)
 DAH_PIN     = 9     // Dah paddle (active LOW with pullup)
 ```
 
-### Audio
+### Audio (MAX98357A I2S Amplifier)
 ```
-BUZZER_PIN  = 5     // PWM output for buzzer
+I2S_BCK_PIN  = 14   // I2S Bit Clock (BCLK)
+I2S_LCK_PIN  = 15   // I2S Left/Right Clock (LRC/WS)
+I2S_DATA_PIN = 16   // I2S Data Output (DIN)
+BUZZER_PIN   = 5    // PWM output (legacy, deprecated)
 ```
+
+**MAX98357A Connections:**
+- BCLK → GPIO 14
+- LRC → GPIO 15
+- DIN → GPIO 16
+- VIN → 3.3V
+- GND → GND
+- GAIN → Float (9dB default) or GND (12dB) or VIN (6dB)
+- SD → Float (always on)
+
+**Speaker/Headphone Output:**
+- Use switched 3.5mm stereo jack (PJ-307 or similar)
+- 100Ω resistor in series with headphone output for volume limiting
+- Speaker connects via normally-closed contacts (auto-mutes when headphones plugged in)
 
 ### Battery Monitoring
 ```
-USB_DETECT_PIN = A3       // USB power detection
 MAX17048 I2C Address: 0x36  // Battery fuel gauge
+// Note: USB_DETECT_PIN (A3) disabled - conflicts with I2S_LCK_PIN (GPIO 15)
 ```
 
 ---
@@ -289,6 +309,14 @@ All hardware settings are centralized in `config.h`:
   - Persistent across reboots
   - Modern card-based UI with rounded corners
 
+- [x] **Volume Control**
+  - Software volume control (0-100%)
+  - Adjustable with up/down arrows in 5% increments
+  - Visual volume bar with color coding (red/yellow/green)
+  - Settings saved to flash memory
+  - Persistent across reboots
+  - Real-time preview when adjusting
+
 #### Connectivity
 - [x] **Vail Chat - Internet CW Repeater**
   - WebSocket connection to vail.woozle.org
@@ -346,8 +374,10 @@ The MAX17048 fuel gauge requires several charge/discharge cycles to accurately l
 ### CardKB LED Flash
 The CardKB keyboard flashes a white LED 3 times during navigation input. This is a hardware feature and cannot be disabled in software.
 
-### USB Detection Threshold
-The USB detection uses an ADC reading on pin A3 with a threshold of 500. This may need adjustment based on actual hardware readings when USB is connected/disconnected.
+### I2S Audio Pin Conflict
+**CRITICAL**: Pin A3 (GPIO 15 on ESP32-S3 Feather) is used by I2S for the LRC clock signal. Using `analogRead(A3)` will reconfigure the pin as an analog input and completely break I2S audio, causing severe distortion. USB charging detection has been disabled to prevent this conflict.
+
+To restore charging detection, use a different GPIO pin or infer charging status from battery voltage trends.
 
 ---
 

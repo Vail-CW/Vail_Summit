@@ -308,7 +308,7 @@ int handleWiFiInput(char key, Adafruit_ST7789 &display) {
     if (key == KEY_UP) {
       if (selectedNetwork > 0) {
         selectedNetwork--;
-        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+        beep(TONE_MENU_NAV, BEEP_SHORT);
         drawNetworkList(display);
         return 1;
       }
@@ -316,7 +316,7 @@ int handleWiFiInput(char key, Adafruit_ST7789 &display) {
     else if (key == KEY_DOWN) {
       if (selectedNetwork < networkCount - 1) {
         selectedNetwork++;
-        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+        beep(TONE_MENU_NAV, BEEP_SHORT);
         drawNetworkList(display);
         return 1;
       }
@@ -328,7 +328,7 @@ int handleWiFiInput(char key, Adafruit_ST7789 &display) {
         passwordInput = "";
         cursorVisible = true;
         lastBlink = millis();
-        tone(BUZZER_PIN, TONE_SELECT, BEEP_MEDIUM);
+        beep(TONE_SELECT, BEEP_MEDIUM);
         drawWiFiUI(display);
       } else {
         // Open network, connect immediately
@@ -356,7 +356,7 @@ int handleWiFiInput(char key, Adafruit_ST7789 &display) {
     else if (key == KEY_ENTER || key == KEY_ENTER_ALT) {
       // Connect with password
       wifiState = WIFI_STATE_CONNECTING;
-      tone(BUZZER_PIN, TONE_SELECT, BEEP_MEDIUM);
+      beep(TONE_SELECT, BEEP_MEDIUM);
       drawWiFiUI(display);
       connectToWiFi(networks[selectedNetwork].ssid, passwordInput);
       return 2;
@@ -364,7 +364,7 @@ int handleWiFiInput(char key, Adafruit_ST7789 &display) {
     else if (key == KEY_ESC) {
       // Cancel password input, back to network list
       wifiState = WIFI_STATE_NETWORK_LIST;
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      beep(TONE_MENU_NAV, BEEP_SHORT);
       drawWiFiUI(display);
       return 1;
     }

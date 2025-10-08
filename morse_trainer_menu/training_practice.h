@@ -51,6 +51,19 @@ void startPracticeMode(Adafruit_ST7789 &display) {
   ditMemory = false;
   dahMemory = false;
 
+  // Disable WiFi to prevent audio interference
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Disabling WiFi for clean audio in practice mode");
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    delay(100);
+  }
+
+  // Reinitialize I2S to ensure clean state
+  Serial.println("Reinitializing I2S for practice mode...");
+  i2s_zero_dma_buffer(I2S_NUM_0);
+  delay(50);
+
   // Calculate dit duration from current speed setting
   ditDuration = DIT_DURATION(cwSpeed);
 
@@ -119,10 +132,10 @@ void drawPracticeUI(Adafruit_ST7789 &display) {
     display.print("Iambic B");
   }
 
-  // Visual indicator area
+  // No visual indicators - keeps display static for best audio performance
   display.setTextColor(ST77XX_WHITE);
-  display.setCursor(40, 165);
-  display.print("Press paddle/key to send");
+  display.setCursor(30, 165);
+  display.print("Key to practice - ESC to exit");
 
   // Draw footer instructions
   display.setTextSize(1);
@@ -172,7 +185,7 @@ void drawPracticeStats(Adafruit_ST7789 &display) {
 int handlePracticeInput(char key, Adafruit_ST7789 &display) {
   if (key == KEY_ESC) {
     practiceActive = false;
-    noTone(BUZZER_PIN);
+    stopTone();
     return -1;  // Exit practice mode
   }
 
@@ -206,9 +219,16 @@ void updatePracticeOscillator() {
 void straightKeyHandler() {
   // Use DIT pin as straight key
   if (ditPressed) {
-    tone(BUZZER_PIN, cwTone);
+    if (!isTonePlaying()) {
+      startTone(cwTone);
+      Serial.println("Started tone");
+    }
+    continueTone(cwTone);
   } else {
-    noTone(BUZZER_PIN);
+    if (isTonePlaying()) {
+      stopTone();
+      Serial.println("Stopped tone");
+    }
   }
 }
 
@@ -226,7 +246,7 @@ void iambicKeyerHandler() {
       inSpacing = false;
       elementStartTime = currentTime;
       ditCount++;
-      tone(BUZZER_PIN, cwTone);
+      startTone(cwTone);
 
       // Clear dit memory
       ditMemory = false;
@@ -239,7 +259,7 @@ void iambicKeyerHandler() {
       inSpacing = false;
       elementStartTime = currentTime;
       dahCount++;
-      tone(BUZZER_PIN, cwTone);
+      startTone(cwTone);
 
       // Clear dah memory
       dahMemory = false;
@@ -248,6 +268,9 @@ void iambicKeyerHandler() {
   // Currently sending an element
   else if (keyerActive && !inSpacing) {
     unsigned long elementDuration = sendingDit ? ditDuration : (ditDuration * 3);
+
+    // Keep tone playing
+    continueTone(cwTone);
 
     // Continuously check for paddle input during element send
     if (ditPressed && dahPressed) {
@@ -270,7 +293,7 @@ void iambicKeyerHandler() {
     // Check if element is complete
     if (currentTime - elementStartTime >= elementDuration) {
       // Element complete, turn off tone and start spacing
-      noTone(BUZZER_PIN);
+      stopTone();
       keyerActive = false;
       sendingDit = false;
       sendingDah = false;

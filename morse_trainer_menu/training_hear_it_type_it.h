@@ -194,7 +194,7 @@ int handleHearItTypeItInput(char key, Adafruit_ST7789& tft) {
 
   if (key == KEY_ESC) {
     // Replay the callsign
-    tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+    beep(TONE_MENU_NAV, BEEP_SHORT);
     drawHearItTypeItUI(tft);
     delay(500);
     playCurrentCallsign();
@@ -203,7 +203,7 @@ int handleHearItTypeItInput(char key, Adafruit_ST7789& tft) {
 
   } else if (key == KEY_TAB) {
     // Skip to next callsign
-    tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+    beep(TONE_MENU_NAV, BEEP_SHORT);
     startNewCallsign();
     drawHearItTypeItUI(tft);
     delay(500);
@@ -221,7 +221,7 @@ int handleHearItTypeItInput(char key, Adafruit_ST7789& tft) {
 
     if (checkAnswer()) {
       // Correct!
-      tone(BUZZER_PIN, TONE_SELECT, BEEP_LONG);
+      beep(TONE_SELECT, BEEP_LONG);
 
       tft.fillRect(0, 140, SCREEN_WIDTH, 60, COLOR_BACKGROUND);
       tft.setFont(&FreeSansBold12pt7b);
@@ -253,7 +253,7 @@ int handleHearItTypeItInput(char key, Adafruit_ST7789& tft) {
 
     } else {
       // Wrong!
-      tone(BUZZER_PIN, TONE_ERROR, BEEP_LONG);
+      beep(TONE_ERROR, BEEP_LONG);
 
       tft.fillRect(0, 140, SCREEN_WIDTH, 60, COLOR_BACKGROUND);
       tft.setFont(&FreeSansBold12pt7b);
@@ -287,7 +287,7 @@ int handleHearItTypeItInput(char key, Adafruit_ST7789& tft) {
     // Remove last character
     if (userInput.length() > 0) {
       userInput.remove(userInput.length() - 1);
-      tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+      beep(TONE_MENU_NAV, BEEP_SHORT);
       return 3; // Input box redraw only
     }
 
@@ -298,7 +298,7 @@ int handleHearItTypeItInput(char key, Adafruit_ST7789& tft) {
       // Only accept alphanumeric
       if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
         userInput += c;
-        tone(BUZZER_PIN, TONE_MENU_NAV, BEEP_SHORT);
+        beep(TONE_MENU_NAV, BEEP_SHORT);
         return 3; // Input box redraw only
       }
     }
